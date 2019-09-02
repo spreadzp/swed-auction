@@ -2,11 +2,6 @@
 {-# CONTENT_TYPE DAPP #-}
 {-# SCRIPT_TYPE ACCOUNT #-}
 
-
-{-# STDLIB_VERSION 3 #-}
-{-# CONTENT_TYPE DAPP #-}
-{-# SCRIPT_TYPE ACCOUNT #-}
-
 let startRoundHeight = 5
 
 func randomizer(inv: Invocation) = {
@@ -19,44 +14,24 @@ func randomizer(inv: Invocation) = {
     sha256(rand)
 }
 
-
-func getRoundNumber1(inv: Invocation) = {
- 
-    let playLimit = wavesBalance(this) / 100
-    let payment = extract(inv.payment)
-
-    if(!isDefined(inv.payment)) then {
-        throw("Should be with Payment in Waves")
-    } else if (isDefined(payment.assetId)) then {
-        throw("Payment should be in Waves")
-    } else if (payment.amount > playLimit) then {
-        throw("Payment should be less than " + toString(playLimit))
-    } else {
-
-        let randhash = randomizer(inv)
-        let winTransfer = TransferSet([ScriptTransfer(inv.caller, payment.amount * 190 / 100, unit)])
-        let writeLastPlay = WriteSet([DataEntry("lastPlay", randhash)])
-
-        if(randhash.toInt() % 1000 < 500) then {
-            ScriptResult(writeLastPlay, winTransfer)
-        } else {
-            ScriptResult(writeLastPlay, TransferSet([]))
-        }
-    }
-} 
-
-func getWinnersPrevRound(currRound: Int, isNumberMore: Boolean) = {
+func setWinnersPrevRound(currRound: Int, randhash: Int) = {
   let prevNumberRound = currRound - 1
-  if (isNumberMore == true) then
-        WriteSet([
-        DataEntry("lastRoundWinner", prevNumberRound.toString() + "_more_" ) 
-        ] 
-      )
-      else       
-        WriteSet([
-        DataEntry("lastRoundWinner", prevNumberRound.toString() + "_less_" ) 
-          ] 
-        ) 
+  if (randhash > 500) then
+    WriteSet([
+      DataEntry("lastRoundWinner", prevNumberRound.toString() + "_more_" ),
+      DataEntry("numberRound", currRound) ,
+      DataEntry("startGame", true),
+      DataEntry("randhash", randhash)
+      ] 
+    )  
+  else  
+    WriteSet([
+      DataEntry("lastRoundWinner", prevNumberRound.toString() + "_less_" ),
+      DataEntry("numberRound", currRound),
+      DataEntry("startGame", true),
+      DataEntry("randhash", randhash)
+        ]
+    ) 
 }
 
 func getCurrentNumberRound() = {
@@ -66,7 +41,38 @@ func getCurrentNumberRound() = {
       } 
 }
 
+func setGamerBet(addressGamer: String, directionRate: String, directionGamer: String, currentBet: Int) = {
+   let currentRound = getCurrentNumberRound()
+   let newNumberOfRound = match getInteger(this, "numberRound") { 
+      case a:Int => a
+      case _ => 1
+    }
+    let numOfGamersCurrDirection = match getInteger(this, newNumberOfRound.toString() + directionGamer) { 
+      case g:Int => g
+      case _ => 0
+    }
+    let numberOfGame = match getInteger(this, "numberGame") { 
+      case g:Int => g
+      case _ => 0
+    }
+    let sumOfBank = match getInteger(this, numberOfGame.toString() + "_bankOfGame") { 
+      case g:Int => g
+      case _ => 0
+    }
+    let sumGamerBets = match getInteger(this, numberOfGame.toString() + "_" + addressGamer) { 
+      case s:Int => s
+      case _ => 0
+    }  
+    WriteSet([
+      DataEntry(currentRound.toString() + directionRate + addressGamer, currentBet),
+      DataEntry(currentRound.toString() + directionGamer, numOfGamersCurrDirection + 1),
+      DataEntry(numberOfGame.toString() + "_bankOfGame", sumOfBank + currentBet),
+      DataEntry(numberOfGame.toString() + "_" + addressGamer, sumGamerBets + currentBet)
+      ]) 
+}
+
 func getBet(bet: Int, round: Int, addressGamer: String) =  {
+  let minBet = 1
   if(round >= 1 ) then { 
     let winnerOfPrevRound = match getString(this, "lastRoundWinner") {
       case w: String => w
@@ -79,53 +85,91 @@ func getBet(bet: Int, round: Int, addressGamer: String) =  {
     }
 
     if(round > 1 && winnerFromPrevRound == "") then {
-      round * 2
+      minBet * round * 2
     }
     else
-      1
+      minBet
   }
   else 
-    1
+    minBet
 }
 
-# func checkOppositeRate() = {
+func isOppositeRate() = {
+  let newNumberOfRound = match getInteger(this, "numberRound") { 
+      case a:Int => a
+      case _ => 1
+    }
+    let numberOfGamersUp = match getInteger(this, newNumberOfRound.toString() + "_countGamersUp") { 
+      case g:Int => g
+      case _ => 0
+    }
+    let numberOfGamersDown = match getInteger(this, newNumberOfRound.toString() + "_countGamersDown") { 
+      case g:Int => g
+      case _ => 0
+    }
+    numberOfGamersUp > 0 && numberOfGamersDown > 0
+}
 
-# }
-func getNumberGame() = {
+func getNextNumberGame() = {
   match getInteger(this, "numberGame") { 
-          case a:Int => a + 1
-          case _ => 1
-        }
+    case a:Int => a + 1
+    case _ => 1
+  }
 }
 
 @Callable(i)
 func startRound() = {
   let newNumberOfRound = match getInteger(this, "numberRound") { 
-        case a:Int => a + 1
-        case _ => 1
-      }
-  let randhash = randomizer(i)    
-  if(newNumberOfRound == 1 && i.caller == this) then    
-    let newNumberGame = getNumberGame()
-    WriteSet([DataEntry("numberGame", newNumberGame)])
-  else if (newNumberOfRound > 1 && i.caller == this) then
-    let isNumberMore = randhash.toInt() % 1000 < 500    
-    getWinnersPrevRound(newNumberOfRound, isNumberMore)
+    case a:Int => a + 1
+    case _ => 1
+  }
+  let randhash = randomizer(i)
+  let isGameStarted = match getBoolean(this, "startGame") {
+    case g:Boolean => g
+    case _ => false
+  } 
+  if(newNumberOfRound == 1 && i.caller == this && !isGameStarted) then    
+    let newNumberGame = getNextNumberGame()
+    WriteSet([
+      DataEntry("numberGame", newNumberGame),
+      DataEntry("startGame", !isGameStarted),
+      DataEntry("numberRound", newNumberOfRound),
+      DataEntry(newNumberGame.toString() + "_bankOfGame", 0)
+      ]) 
+  else if (newNumberOfRound > 1 && i.caller == this && !isGameStarted) then 
+    setWinnersPrevRound(newNumberOfRound, randhash.toInt() % 1000) 
   else
-      throw("Only owner can start the game.")  
+    throw("Only owner can start the game.")  
 } 
 
+@Callable(i)
+func stopGame() = {
+  let isGameStarted = match getBoolean(this, "startGame") {
+    case g:Boolean => g
+    case _ => false
+  } 
+  if(isOppositeRate() && i.caller == this && isGameStarted) then
+    WriteSet([
+      DataEntry("startGame", !isGameStarted)
+    ])
+  else
+    throw("Only owner can start the game.")  
+} 
 
 @Callable(i)
 func makeBetLess() = {
+  let isGameStarted = match getBoolean(this, "startGame") {
+    case g:Boolean => g
+    case _ => false
+  } 
   let pmt = extract(i.payment)
   let addressGamer = toBase58String(i.caller.bytes)
   let currentRound = getCurrentNumberRound()
   let countBet = getBet(pmt.amount, currentRound, addressGamer)
-  if (!isDefined(pmt.assetId) && countBet <= pmt.amount) then
-    WriteSet([DataEntry(currentRound.toString() + "_less_" + addressGamer, pmt.amount )])
+  if (!isDefined(pmt.assetId) && countBet <= pmt.amount && isGameStarted) then    
+    setGamerBet(addressGamer, "_less_", "_countGamersDown", pmt.amount) 
   else if(countBet > pmt.amount) then {
-      throw("Payment must be more for the round!")
+    throw("Payment must be more for the round!")
   }
   else
     throw("works with waves only")
@@ -133,14 +177,18 @@ func makeBetLess() = {
 
 @Callable(i)
 func makeBetMore() = {
+  let isGameStarted = match getBoolean(this, "startGame") {
+    case g:Boolean => g
+    case _ => false
+  } 
   let pmt = extract(i.payment)
   let addressGamer = toBase58String(i.caller.bytes)
   let currentRound = getCurrentNumberRound()
   let countBet = getBet(pmt.amount, currentRound, addressGamer)
-  if (!isDefined(pmt.assetId) && countBet <= pmt.amount) then
-    WriteSet([DataEntry(currentRound.toString() + "_more_" + addressGamer, pmt.amount )])
+  if (!isDefined(pmt.assetId) && countBet <= pmt.amount && isGameStarted) then
+    setGamerBet(addressGamer, "_more_", "_countGamersUp", pmt.amount)
   else if(countBet > pmt.amount) then {
-      throw("Payment must be more for the round!")
+    throw("Payment must be more for the round!")
   }
   else
     throw("works with waves only")

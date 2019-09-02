@@ -1,8 +1,8 @@
 {
-  "name": "angular-ionic-ngxs-movies",
+  "name": "gambling-on-waves",
   "version": "0.0.0",
-  "author": "Adrián Brito Pacheco",
-  "description": "This project show how to use NGXS in Ionic 4 and Angular APP.",
+  "author": "spread2009@gmail.com",
+  "description": "Gambling game on waves blockchain.",
   "license": "MIT",
   "scripts": {
     "ng": "ng",
@@ -63,8 +63,10 @@
     "@types/jasmine": "~3.3.13",
     "@types/jasminewd2": "~2.0.6",
     "@types/node": "~12.0.10",
+    "@waves/surfboard": "^1.6.0",
     "@webcomponents/webcomponentsjs": "^2.2.10",
     "codelyzer": "~5.1.0",
+    "dotenv": "^8.0.0",
     "jasmine-core": "~3.4.0",
     "jasmine-spec-reporter": "~4.2.1",
     "karma": "~4.1.0",
@@ -77,8 +79,6 @@
     "ts-node": "~8.3.0",
     "tslint": "~5.18.0",
     "tslint-ionic-rules": "0.0.21",
-    "typescript": "~3.4.5",
-    "@waves/surfboard": "^1.6.0",
-    "dotenv": "^8.0.0"
+    "typescript": "~3.4.5"
   }
 }

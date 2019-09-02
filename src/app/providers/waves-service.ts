@@ -48,6 +48,7 @@ export class WavesService {
           recipient: "3N3uTGTJwrAHNZzKx1nAnLESByvVcnURNAL"
       }
   };
+  console.log('txData :', txData);
   WavesKeeper.signAndPublishTransaction(txData).then((data) => {
     console.log('data :', data);
       //data - a line ready for sending to Waves network's node (server)

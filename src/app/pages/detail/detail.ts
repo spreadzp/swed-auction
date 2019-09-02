@@ -1,4 +1,4 @@
-import { Component, ViewEncapsulation } from '@angular/core';
+import { Component, ViewEncapsulation, OnInit } from '@angular/core';
 
 import { Movie } from '../../models/movie.model';
 
@@ -22,6 +22,7 @@ import { ActivatedRoute } from '@angular/router';
 
 import { IziToastService } from '../../providers/izi-toast.service';
 import { WavesService } from '../../providers/waves-service';
+import { Game, Round } from '../../models/game';
 
 @Component({
   selector: 'app-page-detail',
@@ -29,18 +30,74 @@ import { WavesService } from '../../providers/waves-service';
   styleUrls: ['./detail.scss'],
   encapsulation: ViewEncapsulation.None
 })
-export class DetailComponent {
+export class DetailComponent implements OnInit {
 
   currentYear = new Date().getFullYear();
   selectedMovie: Observable<Movie>;
   movie: Movie;
+  games: Game[] = [];
+  currentGame: Game = null;
+  currentRound: Round = null;
+  defaultSelectedRadio = "gamer_2";
+  numberRound = 1;
+  startMinNumberRange = 0;
+  startMaxNumberRange = 1023;
+  firstRangeMin = 0;
+  firstRangeMax = 0;
+  secondRangeMin = 0;
+  secondRangeMax = 0;
+  isWinnerRangeUp = false
+  avgRange = 0;
+  showSecretGame = false; 
+
+
+  //Get value on ionChange on IonRadioGroup
+  selectedRadioGroup: any;
+  //Get value on ionSelect on IonRadio item
+  selectedRadioItem: any;
+
+  radio_list = [
+    {
+      id: '1',
+      name: 'radio_list',
+      value: 'gamer_1',
+      text: 'Gamer1',
+      disabled: false,
+      checked: false,
+      color: 'primary'
+    }, {
+      id: '2',
+      name: 'radio_list',
+      value: 'gamer_2',
+      text: 'Gamer2',
+      disabled: false,
+      checked: true,
+      color: 'secondary'
+    }, {
+      id: '3',
+      name: 'radio_list',
+      value: 'gamer_3',
+      text: 'Gamer3',
+      disabled: false,
+      checked: false,
+      color: 'danger'
+    },
+  ];
   genreImages: string[] = ['action', 'comedy', 'crime', 'documentary', 'drama', 'fantasy', 'film noir',
-                           'horror', 'romance', 'science fiction', 'westerns', 'animation', 'food'];
+    'horror', 'romance', 'science fiction', 'westerns', 'animation', 'food'];
 
   constructor(private store: Store, private youtubeApiService: YoutubeApiService, private modalCtrl: ModalController,
-              private activatedRoute: ActivatedRoute, private iziToast: IziToastService, private wavesService: WavesService) {
+    private activatedRoute: ActivatedRoute, private iziToast: IziToastService, private wavesService: WavesService) {
   }
 
+  ngOnInit() {
+    
+    this.startNewGame()
+    this.currentRound = new Round();
+    this.currentRound.numberRound = 1;
+    this.defineRanges(this.startMinNumberRange, this.startMaxNumberRange);
+    console.log('#################this.currentRound :', this.currentRound);
+  }
   ionViewWillEnter() {
     // console.log('ionViewWillEnter');
 
@@ -63,8 +120,8 @@ export class DetailComponent {
       }
     );
     */
-   const id = this.activatedRoute.snapshot.paramMap.get('id');
-   this.getMovieDetails(id);
+    const id = this.activatedRoute.snapshot.paramMap.get('id');
+    this.getMovieDetails(id);
   }
 
   getMovieDetails(id: string) {
@@ -86,33 +143,33 @@ export class DetailComponent {
 
     // Code to use Youtube Api Service: providers/youtube-api-service.ts
     this.youtubeApiService.searchMovieTrailer(this.movie.title)
-    .subscribe(result => {
-      if (result.items.length > 0) {
-        console.log(result);
-        const { videoId } = result.items[0].id;
-        this.movie.videoId = videoId;
+      .subscribe(result => {
+        if (result.items.length > 0) {
+          console.log(result);
+          const { videoId } = result.items[0].id;
+          this.movie.videoId = videoId;
 
-        // Code to use capacitor-youtube-player plugin.
-        console.log('DetailsPage::watchTrailer -> platform: ' + Capacitor.platform);
-        if (Capacitor.platform === 'web') {
-          const componentProps = { modalProps: { item: this.movie}};
-          this.presentModal(componentProps, YoutubeModalComponent);
-        } else { // Native
-          this.testYoutubePlayerPlugin();
-        }
+          // Code to use capacitor-youtube-player plugin.
+          console.log('DetailsPage::watchTrailer -> platform: ' + Capacitor.platform);
+          if (Capacitor.platform === 'web') {
+            const componentProps = { modalProps: { item: this.movie } };
+            this.presentModal(componentProps, YoutubeModalComponent);
+          } else { // Native
+            this.testYoutubePlayerPlugin();
+          }
 
-        /*
-        if (Capacitor.platform === 'web') {
-          window.open('https://www.youtube.com/watch?v=' + videoId);
-        } else { // TODO: Use capacitor-youtube-player plugin.
-          window.open('https://www.youtube.com/watch?v=' + videoId, '_blank');
+          /*
+          if (Capacitor.platform === 'web') {
+            window.open('https://www.youtube.com/watch?v=' + videoId);
+          } else { // TODO: Use capacitor-youtube-player plugin.
+            window.open('https://www.youtube.com/watch?v=' + videoId, '_blank');
+          }
+          */
         }
-        */
-      }
-    },
-    error => {
-      this.iziToast.show('Watch Trailer', 'Sorry, an error has occurred.', 'red', 'ico-error', 'assets/avatar.png');
-    });
+      },
+        error => {
+          this.iziToast.show('Watch Trailer', 'Sorry, an error has occurred.', 'red', 'ico-error', 'assets/avatar.png');
+        });
 
   }
 
@@ -125,7 +182,7 @@ export class DetailComponent {
     });
     await modal.present();
 
-    const {data} = await modal.onWillDismiss();
+    const { data } = await modal.onWillDismiss();
     if (data) {
       console.log('data', data);
     }
@@ -135,10 +192,10 @@ export class DetailComponent {
 
     const { YoutubePlayer } = Plugins;
 
-    const result = await YoutubePlayer.echo({value: 'hola' });
+    const result = await YoutubePlayer.echo({ value: 'hola' });
     console.log('result', result);
 
-    const options = {width: 640, height: 360, videoId: this.movie.videoId};
+    const options = { width: 640, height: 360, videoId: this.movie.videoId };
     const playerReady = await YoutubePlayer.initialize(options);
   }
 
@@ -155,13 +212,13 @@ export class DetailComponent {
 
   onClickComment() {
     console.log('DetailsPage::onClickComment');
-    const componentProps = { modalProps: { title: 'Comment', movie: this.movie}};
+    const componentProps = { modalProps: { title: 'Comment', movie: this.movie } };
     this.presentModal(componentProps, CommentModalComponent);
   }
 
   onClickShowComment() {
     console.log('DetailsPage::onClickShowComment');
-    const componentProps = { modalProps: { title: 'Comments', movie: this.movie}};
+    const componentProps = { modalProps: { title: 'Comments', movie: this.movie } };
     this.presentModal(componentProps, ShowCommentsModalComponent);
   }
 
@@ -181,8 +238,8 @@ export class DetailComponent {
         if (exist.length === 0) {
           this.store.dispatch(
             new FavoriteMovie(this.movie)).subscribe(() => {
-            this.iziToast.success('Favorite movie', 'Favorite Movie added.');
-          });
+              this.iziToast.success('Favorite movie', 'Favorite Movie added.');
+            });
         } else {
           this.iziToast.show('Favorite movie', 'The movie has already been added.', 'red', 'ico-error', 'assets/avatar.png');
         }
@@ -199,7 +256,7 @@ export class DetailComponent {
       }).then(() => {
         console.log('Thanks for sharing!');
       })
-      .catch(console.error);
+        .catch(console.error);
     } else {
       // fallback
     }
@@ -207,13 +264,112 @@ export class DetailComponent {
 
   showActors() {
     console.log('DetailsPage::showActors | method called');
-    const componentProps = { modalProps: { actors: this.movie.cast}};
+    const componentProps = { modalProps: { actors: this.movie.cast } };
     this.presentModal(componentProps, ShowActorsModalComponent);
   }
 
-  makeBit() {
-    return this.wavesService.makeBet(0.5);
+  radioGroupChange(event) {
+    console.log("radioGroupChange", event.detail);
+    this.selectedRadioGroup = event.detail;
   }
 
-  
+  radioFocus() {
+    console.log("radioFocus");
+  }
+  radioSelect(event) {
+    console.log("radioSelect", event.detail);
+    this.selectedRadioItem = event.detail;
+  }
+  radioBlur() {
+    console.log("radioBlur");
+  }
+
+  makeBet() {
+    return this.wavesService.makeBet(0.5);
+  }
+  makeBetDown() {
+    console.log('this.selectedRadioItem :', this.selectedRadioGroup.value);
+    this.currentGame.bank += 1;
+    //this.currentGame.gamerBets[this.selectedRadioGroup.value] += 1;
+    console.log('makeBetDownthis.currentGame :', this.currentGame);
+    console.log('makeBetDown.currentRound :', this.currentRound);
+    if(!this.currentRound.gamersBetDown.includes(this.selectedRadioGroup.value)) {
+      this.currentRound.gamersBetDown.push(this.selectedRadioGroup.value);
+    } else {
+      console.log('had opposite bit :');
+    }
+   
+  }
+  makeBetUp() {
+    console.log('this.selectedRadioItem :', this.selectedRadioGroup.value);
+    this.currentGame.bank += 1;
+    //this.currentGame.gamerBets[this.selectedRadioGroup.value] += 1;
+    console.log('makeBetUpthis.currentGame :', this.currentGame);
+    console.log('makeBetUp.currentRound :', this.currentRound);
+if(!this.currentRound.gamersBetDown.includes(this.selectedRadioGroup.value)) {
+  this.currentRound.gamersBetUp.push(this.selectedRadioGroup.value);
+} else {
+  console.log('had opposite bit :');
+}
+    
+  }
+  defineRanges(minNumber: number, maxNumber: number) {
+    let sumMinAndMax = maxNumber + minNumber;
+    this.avgRange = sumMinAndMax % 2 === 0 ? sumMinAndMax / 2 : (sumMinAndMax + 1) / 2;
+    this.firstRangeMin = minNumber;
+    this.firstRangeMax = this.avgRange - 1;
+    this.secondRangeMin = this.avgRange;
+    this.secondRangeMax = maxNumber;
+    this.currentRound.minNumberRange = minNumber;
+    this.currentRound.maxNumberRange = maxNumber;
+  }
+
+  setRange(isWinnerDirectionUp: boolean, lastAvgRange: number, minRange: number, maxRange: number) {
+    if(isWinnerDirectionUp) {
+      this.defineRanges(lastAvgRange, maxRange);
+    } else {
+      this.defineRanges(minRange, lastAvgRange - 1);
+    }
+  }
+  nextRound() {
+    console.log('++++nextRoundthis.currentGame :', this.currentGame);
+    const round = this.currentRound;
+    this.currentGame.rounds.push(this.currentRound);
+    this.currentRound = new Round();
+    this.numberRound++;
+    this.currentRound.isLastWinnerRangeUp = this.winnerRangeDirection();
+    
+    if ((this.numberRound % 11 === 0)) {
+      const secretNumber = (this.currentRound.isLastWinnerRangeUp) ?
+      round.maxNumberRange : round.minNumberRange;
+      this.currentGame.secretNumberOfGame = secretNumber;
+      this.showSecretGame = true;
+    }  else if ((this.numberRound === 12)) {
+       
+      this.numberRound = 1; 
+      this.showSecretGame = false;
+      this.startNewGame(this.currentGame);
+      this.defineRanges(this.startMinNumberRange, this.startMaxNumberRange);
+    } 
+    else {
+      this.showSecretGame = false;
+      this.setRange(this.currentRound.isLastWinnerRangeUp,this.avgRange, round.minNumberRange, round.maxNumberRange);
+    }
+    this.currentRound.numberRound = this.numberRound;
+    
+  }
+
+  startNewGame(game?: Game) {
+    this.currentGame = new Game();
+    if (!game) {
+      this.currentGame.numberGame = 1;
+    } else {
+      this.games.push(game);
+      this.currentGame.numberGame = game.numberGame + 1;
+    }
+    this.currentGame.bank = 0;
+  }
+  winnerRangeDirection() {
+    return this.isWinnerRangeUp = Math.round((Math.random() * 1) + 0) === 0;
+  }
 }
