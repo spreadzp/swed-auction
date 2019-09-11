@@ -40,6 +40,12 @@ func getCurrentNumberRound() = {
         case _ => 1
       } 
 }
+func getGamerBet(addressGamer: String, direction: String, currentRound: Int) = {
+  match getString(this, currentRound.toString() + "_" + direction + "_" + addressGamer) { 
+        case g:String => g
+        case _ => ""
+  } 
+}
 
 func setGamerBet(addressGamer: String, directionRate: String, directionGamer: String, currentBet: Int) = {
    let currentRound = getCurrentNumberRound()
@@ -71,25 +77,24 @@ func setGamerBet(addressGamer: String, directionRate: String, directionGamer: St
       ]) 
 }
 
-func getBet(bet: Int, round: Int, addressGamer: String) =  {
-  let minBet = 1
-  if(round >= 1 ) then { 
+func getBet(round: Int, addressGamer: String) =  {
+  let minBet = 100000000
+  if(round > 1 ) then { 
     let winnerOfPrevRound = match getString(this, "lastRoundWinner") {
       case w: String => w
       case _ => ""
 
     }
-    let winnerFromPrevRound = match getString(this, winnerOfPrevRound + addressGamer) {
-      case w: String => w
-      case _ => ""
+    let winnerBetFromPrevRound = match getInteger(this, winnerOfPrevRound + addressGamer) {
+      case w: Int => w
+      case _ => 0
     }
 
-    if(round > 1 && winnerFromPrevRound == "") then {
+    if(winnerBetFromPrevRound == 0) then 
       minBet * round * 2
-    }
-    else
+    else 
       minBet
-  }
+  } 
   else 
     minBet
 }
@@ -127,19 +132,28 @@ func startRound() = {
   let isGameStarted = match getBoolean(this, "startGame") {
     case g:Boolean => g
     case _ => false
-  } 
-  if(newNumberOfRound == 1 && i.caller == this && !isGameStarted) then    
+  }
+  if(i.caller != this) then
+    throw("Only owner can start the game.") 
+  else if(newNumberOfRound == 8 && i.caller == this && !isGameStarted) then    
     let newNumberGame = getNextNumberGame()
     WriteSet([
       DataEntry("numberGame", newNumberGame),
       DataEntry("startGame", !isGameStarted),
-      DataEntry("numberRound", newNumberOfRound),
+      DataEntry("numberRound", 1),
       DataEntry(newNumberGame.toString() + "_bankOfGame", 0)
       ]) 
   else if (newNumberOfRound > 1 && i.caller == this && !isGameStarted) then 
-    setWinnersPrevRound(newNumberOfRound, randhash.toInt() % 1000) 
+    setWinnersPrevRound(newNumberOfRound, randhash.toInt() % 1000)
+  else if (newNumberOfRound == 1 && i.caller == this && !isGameStarted) then 
+    WriteSet([
+      DataEntry("numberGame", 1),
+      DataEntry("startGame", !isGameStarted),
+      DataEntry("numberRound", 1),
+      DataEntry(1.toString() + "_bankOfGame", 0)
+      ])    
   else
-    throw("Only owner can start the game.")  
+    throw("Same error.")  
 } 
 
 @Callable(i)
@@ -165,12 +179,14 @@ func makeBetLess() = {
   let pmt = extract(i.payment)
   let addressGamer = toBase58String(i.caller.bytes)
   let currentRound = getCurrentNumberRound()
-  let countBet = getBet(pmt.amount, currentRound, addressGamer)
-  if (!isDefined(pmt.assetId) && countBet <= pmt.amount && isGameStarted) then    
-    setGamerBet(addressGamer, "_less_", "_countGamersDown", pmt.amount) 
-  else if(countBet > pmt.amount) then {
-    throw("Payment must be more for the round!")
-  }
+  let countBet = getBet(currentRound, addressGamer)
+
+  if (getGamerBet(addressGamer, "more", currentRound) != "" ) then 
+    throw("The gamer already made opposite a bet in the round!")  
+  else if(countBet > pmt.amount) then 
+    throw("Payment must be more for the round!" + countBet.toString() + pmt.amount.toString())  
+  else if (!isDefined(pmt.assetId) && countBet <= pmt.amount && isGameStarted) then    
+    setGamerBet(addressGamer, "_less_", "_countGamersDown", pmt.amount)  
   else
     throw("works with waves only")
 }
@@ -184,12 +200,14 @@ func makeBetMore() = {
   let pmt = extract(i.payment)
   let addressGamer = toBase58String(i.caller.bytes)
   let currentRound = getCurrentNumberRound()
-  let countBet = getBet(pmt.amount, currentRound, addressGamer)
-  if (!isDefined(pmt.assetId) && countBet <= pmt.amount && isGameStarted) then
-    setGamerBet(addressGamer, "_more_", "_countGamersUp", pmt.amount)
-  else if(countBet > pmt.amount) then {
-    throw("Payment must be more for the round!")
-  }
+  let countBet = getBet(currentRound, addressGamer)
+  
+  if (getGamerBet(addressGamer, "less", currentRound) != "" ) then 
+    throw("The gamer already made opposite bet in the round!")
+  else if(countBet > pmt.amount) then
+    throw("Payment must be more for the round!" + countBet.toString() + pmt.amount.toString())
+  else if (!isDefined(pmt.assetId) && countBet <= pmt.amount && isGameStarted) then
+    setGamerBet(addressGamer, "_more_", "_countGamersUp", pmt.amount) 
   else
     throw("works with waves only")
 }

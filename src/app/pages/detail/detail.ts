@@ -48,7 +48,7 @@ export class DetailComponent implements OnInit {
   secondRangeMax = 0;
   isWinnerRangeUp = false
   avgRange = 0;
-  showSecretGame = false; 
+  showSecretGame = false;
 
 
   //Get value on ionChange on IonRadioGroup
@@ -91,7 +91,7 @@ export class DetailComponent implements OnInit {
   }
 
   ngOnInit() {
-    
+
     this.startNewGame()
     this.currentRound = new Round();
     this.currentRound.numberRound = 1;
@@ -288,30 +288,22 @@ export class DetailComponent implements OnInit {
     return this.wavesService.makeBet(0.5);
   }
   makeBetDown() {
-    console.log('this.selectedRadioItem :', this.selectedRadioGroup.value);
-    this.currentGame.bank += 1;
-    //this.currentGame.gamerBets[this.selectedRadioGroup.value] += 1;
-    console.log('makeBetDownthis.currentGame :', this.currentGame);
-    console.log('makeBetDown.currentRound :', this.currentRound);
-    if(!this.currentRound.gamersBetDown.includes(this.selectedRadioGroup.value)) {
+    if (!this.currentRound.gamersBetUp.includes(this.selectedRadioGroup.value)) {
+      this.currentGame.bank += 1;
       this.currentRound.gamersBetDown.push(this.selectedRadioGroup.value);
     } else {
       console.log('had opposite bit :');
     }
-   
+
   }
   makeBetUp() {
-    console.log('this.selectedRadioItem :', this.selectedRadioGroup.value);
-    this.currentGame.bank += 1;
-    //this.currentGame.gamerBets[this.selectedRadioGroup.value] += 1;
-    console.log('makeBetUpthis.currentGame :', this.currentGame);
-    console.log('makeBetUp.currentRound :', this.currentRound);
-if(!this.currentRound.gamersBetDown.includes(this.selectedRadioGroup.value)) {
-  this.currentRound.gamersBetUp.push(this.selectedRadioGroup.value);
-} else {
-  console.log('had opposite bit :');
-}
-    
+    if (!this.currentRound.gamersBetDown.includes(this.selectedRadioGroup.value)) {
+      this.currentRound.gamersBetUp.push(this.selectedRadioGroup.value);
+      this.currentGame.bank += 1;
+    } else {
+      console.log('had opposite bit :');
+    }
+
   }
   defineRanges(minNumber: number, maxNumber: number) {
     let sumMinAndMax = maxNumber + minNumber;
@@ -325,38 +317,44 @@ if(!this.currentRound.gamersBetDown.includes(this.selectedRadioGroup.value)) {
   }
 
   setRange(isWinnerDirectionUp: boolean, lastAvgRange: number, minRange: number, maxRange: number) {
-    if(isWinnerDirectionUp) {
+    if (isWinnerDirectionUp) {
       this.defineRanges(lastAvgRange, maxRange);
     } else {
       this.defineRanges(minRange, lastAvgRange - 1);
     }
   }
+  checkOppositeBet() {
+    if (this.currentRound.gamersBetDown.length > 0 && this.currentRound.gamersBetUp.length > 0)
+      return true;
+  }
+
   nextRound() {
-    console.log('++++nextRoundthis.currentGame :', this.currentGame);
-    const round = this.currentRound;
-    this.currentGame.rounds.push(this.currentRound);
-    this.currentRound = new Round();
-    this.numberRound++;
-    this.currentRound.isLastWinnerRangeUp = this.winnerRangeDirection();
-    
-    if ((this.numberRound % 11 === 0)) {
-      const secretNumber = (this.currentRound.isLastWinnerRangeUp) ?
-      round.maxNumberRange : round.minNumberRange;
-      this.currentGame.secretNumberOfGame = secretNumber;
-      this.showSecretGame = true;
-    }  else if ((this.numberRound === 12)) {
-       
-      this.numberRound = 1; 
-      this.showSecretGame = false;
-      this.startNewGame(this.currentGame);
-      this.defineRanges(this.startMinNumberRange, this.startMaxNumberRange);
-    } 
-    else {
-      this.showSecretGame = false;
-      this.setRange(this.currentRound.isLastWinnerRangeUp,this.avgRange, round.minNumberRange, round.maxNumberRange);
+    if (this.checkOppositeBet()) {
+      console.log('++++nextRoundthis.currentGame :', this.currentGame);
+      const round = this.currentRound;
+      this.currentGame.rounds.push(this.currentRound);
+      this.currentRound = new Round();
+      this.numberRound++;
+      this.currentRound.isLastWinnerRangeUp = this.winnerRangeDirection();
+
+      if ((this.numberRound % 11 === 0)) {
+        const secretNumber = (this.currentRound.isLastWinnerRangeUp) ?
+          round.maxNumberRange : round.minNumberRange;
+        this.currentGame.secretNumberOfGame = secretNumber;
+        this.showSecretGame = true;
+      } else if ((this.numberRound === 12)) {
+
+        this.numberRound = 1;
+        this.showSecretGame = false;
+        this.startNewGame(this.currentGame);
+        this.defineRanges(this.startMinNumberRange, this.startMaxNumberRange);
+      }
+      else {
+        this.showSecretGame = false;
+        this.setRange(this.currentRound.isLastWinnerRangeUp, this.avgRange, round.minNumberRange, round.maxNumberRange);
+      }
+      this.currentRound.numberRound = this.numberRound;
     }
-    this.currentRound.numberRound = this.numberRound;
-    
   }
 
   startNewGame(game?: Game) {

@@ -12,10 +12,7 @@
     "lint": "ng lint",
     "e2e": "ng e2e",
     "serv": "cd json-server && json-server --watch db.json",
-    "ozo-start": "npx surfboard test ozo.ride-test.js",
-    "tg": "npx surfboard test game-test.js",
-    "deploy": "npx surfboard test scripts/issue.js",
-    "new-date-presell": "npx surfboard test scripts/presellTimeSwitcher.js -v"
+    "tg": "npx surfboard test game-test.js"
   },
   "private": true,
   "dependencies": {
